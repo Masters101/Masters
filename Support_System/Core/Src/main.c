@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stdio.h"
 #include "math.h"
 #include "Motor_Control.h"
 #include "PCA9685_driver.h"
@@ -41,8 +42,8 @@
 	volatile State Mode;
 
 	#define Setpoint 0
-	#define Min_Len -250
-	#define Max_Len 250
+	#define Min_Len -325
+	#define Max_Len 325
 
 /* USER CODE END PD */
 
@@ -63,24 +64,21 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 	extern volatile uint8_t ON_BUTTON;
 	extern volatile uint8_t OFF_BUTTON;
-	float current_pos_top;
-	float current_pos_left;
-	float current_pos_right;
-	float PID_Output1;
-	float PID_Output2;
 	volatile uint8_t Forward = 1;
 	volatile uint8_t Backward= 0;
+	float PID_Output1;
+	float PID_Output2;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -92,6 +90,7 @@ static void MX_I2C1_Init(void);
 			.device_address = PCA9685_I2C_DEFAULT_DEVICE_ADDRESS,
 			.inverted = false
 	};
+
 /* USER CODE END 0 */
 
 /**
@@ -101,7 +100,7 @@ static void MX_I2C1_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	Mode = idle;
+   	Mode = idle;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -122,11 +121,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 	uint8_t student[] = {'C','O','N','N','E','C','T','E','D'};
 	uint8_t ON[] = {'O','N','_','M','O','D','E'};
@@ -144,6 +143,10 @@ int main(void)
 	float Previous_Error2 = 0;
 	float Error_Derivative1 = 0;
 	float Error_Derivative2 = 0;
+	float current_pos_top;
+	float current_pos_left;
+	float current_pos_right;
+
 
   /* USER CODE END 2 */
 
@@ -153,21 +156,25 @@ int main(void)
   {
 	  if(ON_BUTTON == 1)
 	  {
-		  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1) == 0)
+		  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1) == 1)
 		  {
 			  Mode = ON_MODE;
+			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, 1);
 			  ON_BUTTON = 0;
+   			  HAL_UART_Transmit(&huart2, ON, 7, 100);
 		  }
 	  }
 
 	  if(OFF_BUTTON == 1)
 	  {
-		  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == 0)
+		  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == 1)
 		  {
 			  Mode = OFF_MODE;
+			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, 0);
+			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
 			  OFF_BUTTON = 0;
+			  HAL_UART_Transmit(&huart2, OFF, 8, 100);
 		  }
-
 	  }
 
 
@@ -180,12 +187,11 @@ int main(void)
 
 	  case ON_MODE:
 	  {
-	  	HAL_UART_Transmit(&huart2, ON, 7, 100);
 
-	  	// Start Encoder Timer
-	  	HAL_TIM_Encoder_Start(&htim1,TIM_CHANNEL_ALL);
-	  	HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_ALL);
-	  	HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
+		// Start Encoder Timer
+		HAL_TIM_Encoder_Start(&htim1,TIM_CHANNEL_ALL);
+		HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_ALL);
+		HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
 
 	  	// Initialize and Startup PWM Driver
 	  	pca9685_init(&handle);
@@ -196,18 +202,27 @@ int main(void)
 	  	pca9685_set_channel_duty_cycle(&handle,1,0.0f,false);
 
 	  	// Read Encoder Values
-	  	Read_Encoder_Values();
+	  	char left_enc_buffer[8];
+	  	current_pos_top = Read_Encoder_Top();
+	  	current_pos_left = Read_Encoder_Left();
+	  	current_pos_right = Read_Encoder_Right();
+
+	  	sprintf(left_enc_buffer, "\n%.5f", current_pos_top);
+	  	HAL_UART_Transmit(&huart2, left_enc_buffer, sizeof(left_enc_buffer), 100);
+
 
 	  	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	  	///////////////////////////////////////////////// CONTROL LOOP ///////////////////////////////////////////////////
 
 	  	// Proportional Error (Relative Position)
 	  	Error1 = current_pos_top - current_pos_left;
+	  	//Error2 = Error1;
 	  	Error2 = current_pos_top - current_pos_right;
 
 	  	// To void integral wind-up, restrict integral error to reasonable values
 		//Integral Error
 	  	Error_Integral1 = Error_Integral1 + Error1;
+	  	//Error_Integral2 = Error_Integral1;
 	  	Error_Integral2 = Error_Integral2 + Error2;
 
 	  	if (Error_Integral1 > 50)
@@ -285,10 +300,15 @@ int main(void)
 		  Kill_Motors();
 		  pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); //SET DUTY CYCLE TO ZERO
 		  pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); //SET DUTY CYCLE TO ZERO
-		  HAL_UART_Transmit(&huart2, OFF, 8, 100);
+
+		  // Switch Encoder Timers Off
+		  HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
+		  HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
+		  HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
+
 		  while(1)
 		  {
-
+			  // Do Nothing
 		  }
 		  break;
 	  }
@@ -315,12 +335,14 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -472,11 +494,11 @@ static void MX_TIM2_Init(void)
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 10;
+  sConfig.IC1Filter = 10 ;
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 10;
+  sConfig.IC2Filter = 0;
   if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -593,15 +615,18 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+
   /*Configure GPIO pins : PC1 PC2 */
   GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
@@ -611,12 +636,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PA7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PC6 PC7 PC8 PC9 */
   GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);

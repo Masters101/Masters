@@ -13,9 +13,13 @@
 
 #define FORWARD 1
 #define BACKWARD 0
-#define count 2.0904 // this counter value is not correct
+#define RAD 0.9974556675 // 1 encoder count = 57.15 degrees of rotation
+#define Pulley 15.5
+#define Radius 100
 #define PPR 1000
 
 void Set_Motor_Parameters(uint8_t DIR);
-float Read_Encoder_Values(void);
+float Read_Encoder_Top(void);
+float Read_Encoder_Left(void);
+float Read_Encoder_Right(void);
 void Kill_Motors(void);

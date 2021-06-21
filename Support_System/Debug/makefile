@@ -62,7 +62,7 @@ main-build: Support_System.elf secondary-outputs
 
 # Tool invocations
 Support_System.elf: $(OBJS) $(USER_OBJS) C:\Users\alan\Documents\Support\ System\ Code_v1\Support\ System\ Code\Support_System\STM32F334R8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Support_System.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\alan\Documents\Support System Code_v1\Support System Code\Support_System\STM32F334R8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Support_System.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "Support_System.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\alan\Documents\Support System Code_v1\Support System Code\Support_System\STM32F334R8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Support_System.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

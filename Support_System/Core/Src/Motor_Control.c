@@ -33,26 +33,46 @@ void Set_Motor_Parameters(uint8_t DIR) // SET MOTOR PARAMETERS --> NEED TO ADD P
 	}
 }
 
-float Read_Encoder_Values(void)
+float Read_Encoder_Top(void)
 {
-	uint32_t  myEnc_top;
+	uint32_t myEnc_top;
+	int16_t count1 = 0;
 	float current_pos_top;
-	uint32_t myEnc_Left;
-	float current_pos_left;
-	uint32_t myEnc_Right;
-	float current_pos_right;
 
 	// TOP ENCODER
-	myEnc_top = ((TIM1 -> CNT) >> 2); // Shifted right by 2 to show 1 tick for each actual encoder tick
-	current_pos_top = (float)myEnc_top*((2*M_PI)/PPR)*count;
-	// LEFT MOTOR ENCODER
-	myEnc_Left = ((TIM2 -> CNT) >> 2); // Shift right by 2 to show 1 tick for each actual encoder tick
-	current_pos_left = (float)myEnc_Left*((2*M_PI)/PPR); // needs to be multiplied by a count
-	// RIGHT MOTOR ENCODER
-	myEnc_Right = ((TIM3 -> CNT) >> 2);
-	current_pos_right = (float)myEnc_Right*((2*M_PI)/PPR); // needs to be multiplied by a count, will be the same as left motor
+	myEnc_top = (TIM1 -> CNT);
+	count1 = (int16_t) myEnc_top/4;
+	current_pos_top = count1*((2*M_PI)/PPR)*RAD*Pulley;
 
-	return (float)current_pos_top, (float)current_pos_left, (float)current_pos_right;
+	return current_pos_top;
+}
+
+float Read_Encoder_Left(void)
+{
+	uint32_t myEnc_Left;
+	float current_pos_left;
+	int16_t count = 0;
+
+	// LEFT MOTOR ENCODER
+	myEnc_Left = (TIM2 -> CNT);
+	count = (int16_t) myEnc_Left/4;
+	current_pos_left =  count*((2*M_PI)/PPR)*RAD*Radius;
+
+	return current_pos_left;
+}
+
+float Read_Encoder_Right(void)
+{
+	uint32_t myEnc_Right;
+	int16_t count2 = 0;
+	float current_pos_right;
+
+	// RIGHT MOTOR ENCODER
+	myEnc_Right = (TIM3 -> CNT);
+	count2 = (int16_t) myEnc_Right/4;
+	current_pos_right = count2*((2*M_PI)/PPR)*RAD*Radius;
+
+	return current_pos_right;
 }
 
 void Kill_Motors(void)

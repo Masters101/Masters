@@ -1,3 +1,5 @@
 Motor_Control.c:11:6:Set_Motor_Parameters	16	static
-Motor_Control.c:36:7:Read_Encoder_Values	32	static
-Motor_Control.c:58:6:Kill_Motors	8	static
+Motor_Control.c:36:7:Read_Encoder_Top	24	static
+Motor_Control.c:50:7:Read_Encoder_Left	24	static
+Motor_Control.c:64:7:Read_Encoder_Right	24	static
+Motor_Control.c:78:6:Kill_Motors	8	static
