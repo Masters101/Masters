@@ -85,11 +85,6 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-	pca9685_handle_t handle = {
-			.i2c_handle = &hi2c1,
-			.device_address = PCA9685_I2C_DEFAULT_DEVICE_ADDRESS,
-			.inverted = false
-	};
 
 /* USER CODE END 0 */
 
@@ -130,6 +125,8 @@ int main(void)
 	uint8_t student[] = {'C','O','N','N','E','C','T','E','D'};
 	uint8_t ON[] = {'O','N','_','M','O','D','E'};
 	uint8_t OFF[] = {'O','F','F','_','M','O','D','E'};
+	uint8_t forward[] = {'F','O','R','W','A','R','D'};
+	uint8_t backward[] = {'B','A','C','K','W','A','R','D'};
 	HAL_UART_Transmit(&huart2, student, 9, 100);
 
 	volatile uint8_t Kp = 1;
@@ -147,6 +144,7 @@ int main(void)
 	float current_pos_left;
 	float current_pos_right;
 
+	pca9685_init(&hi2c1,PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 1000.0f);
 
   /* USER CODE END 2 */
 
@@ -162,6 +160,11 @@ int main(void)
 			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, 1);
 			  ON_BUTTON = 0;
    			  HAL_UART_Transmit(&huart2, ON, 7, 100);
+
+   			  // Start Encoder Timer
+   			  HAL_TIM_Encoder_Start(&htim1,TIM_CHANNEL_ALL);
+   			  HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_ALL);
+   			  HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
 		  }
 	  }
 
@@ -187,20 +190,6 @@ int main(void)
 
 	  case ON_MODE:
 	  {
-
-		// Start Encoder Timer
-		HAL_TIM_Encoder_Start(&htim1,TIM_CHANNEL_ALL);
-		HAL_TIM_Encoder_Start(&htim2,TIM_CHANNEL_ALL);
-		HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
-
-	  	// Initialize and Startup PWM Driver
-	  	pca9685_init(&handle);
-	  	pca9685_set_pwm_frequency(&handle, 1000.0f);
-	  	pca9685_set_pwm_channel_times(&handle,0,4096,0); // Duty cycle of 0%
-	  	pca9685_set_pwm_channel_times(&handle,1,4096,0); // Duty cycle of 0%
-	  	pca9685_set_channel_duty_cycle(&handle,0,0.0f,false);
-	  	pca9685_set_channel_duty_cycle(&handle,1,0.0f,false);
-
 	  	// Read Encoder Values
 	  	char left_enc_buffer[8];
 	  	current_pos_top = Read_Encoder_Top();
@@ -254,26 +243,30 @@ int main(void)
 	  	PID_Output1 = (Kp*Error1)+(Ki*Error_Integral1)+(Kd*Error_Derivative1); // Map to PWM Signal
 	  	PID_Output2 = (Kp*Error2)+(Ki*Error_Integral2)+(Kd*Error_Derivative2); // Map to PWM Signal
 
-	  	if(current_pos_top <= Setpoint)
+	  	if(current_pos_top < Setpoint)
 	  	{
 	  		Set_Motor_Parameters(Forward);
-	  		pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); // NEED TO SEND NEW DUTY CYCLE
-	  		pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); // NEED TO SEND NEW DUTY CYCLE
+	  		//HAL_UART_Transmit(&huart2, backward, 8, 100);
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.05f);
 	  	}
 
 	  	if(current_pos_top > Setpoint)
 	  	{
 	  		Set_Motor_Parameters(Backward);
-	  		pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); // NEED TO SEND NEW DUTY CYCLE
-			pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); // NEED TO SEND NEW DUTY CYCLE
+	  		//HAL_UART_Transmit(&huart2, forward, 7, 100);
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.05f);
 	  	}
 
 	  	if(current_pos_top >= Max_Len)
 	  	{
-	  		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, 1);  // Trigger Relay if max rail length exceeded
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.0f);
 	  		Kill_Motors();
-	  		pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); //SET DUTY CYCLE TO ZERO
-	  		pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); //SET DUTY CYCLE TO ZERO
+
+	  		// Switch Encoder Timers Off
+		    HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
+		    HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
+		    HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
+
 	  		while(1)
 	  		{
 	  			// Do Nothing
@@ -282,10 +275,13 @@ int main(void)
 
 	  	if(current_pos_top <= Min_Len)
 	  	{
-	  		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, 1);  // Trigger Relay if min rail length exceeded
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.0f);
 	  		Kill_Motors();
-	  		pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); //SET DUTY CYCLE TO ZERO
-	  		pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); //SET DUTY CYCLE TO ZERO
+
+		    // Switch Encoder Timers Off
+			HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
+			HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
+			HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
 	  		while(1)
 	  		{
 	  			// Do Nothing
@@ -298,8 +294,6 @@ int main(void)
 	  case OFF_MODE:
 	  {
 		  Kill_Motors();
-		  pca9685_set_channel_duty_cycle(&handle,0,0.0f,false); //SET DUTY CYCLE TO ZERO
-		  pca9685_set_channel_duty_cycle(&handle,1,0.0f,false); //SET DUTY CYCLE TO ZERO
 
 		  // Switch Encoder Timers Off
 		  HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);

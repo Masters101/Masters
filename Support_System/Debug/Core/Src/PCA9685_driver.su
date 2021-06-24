@@ -1,6 +1,2 @@
-PCA9685_driver.c:54:6:pca9685_init	48	static
-PCA9685_driver.c:85:13:pca9685_sleep	32	static
-PCA9685_driver.c:101:6:pca9685_wakeup	32	static
-PCA9685_driver.c:127:6:pca9685_set_pwm_frequency	40	static
-PCA9685_driver.c:142:6:pca9685_set_pwm_channel_times	48	static
-PCA9685_driver.c:160:6:pca9685_set_channel_duty_cycle	40	static
+PCA9685_driver.c:24:6:pca9685_init	48	static
+PCA9685_driver.c:58:6:pca9685_set_pwm	48	static
