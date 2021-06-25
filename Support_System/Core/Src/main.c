@@ -66,8 +66,6 @@ UART_HandleTypeDef huart2;
 	extern volatile uint8_t OFF_BUTTON;
 	volatile uint8_t Forward = 1;
 	volatile uint8_t Backward= 0;
-	float PID_Output1;
-	float PID_Output2;
 
 /* USER CODE END PV */
 
@@ -95,7 +93,7 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-   	Mode = idle;
+       	Mode = idle;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -125,8 +123,8 @@ int main(void)
 	uint8_t student[] = {'C','O','N','N','E','C','T','E','D'};
 	uint8_t ON[] = {'O','N','_','M','O','D','E'};
 	uint8_t OFF[] = {'O','F','F','_','M','O','D','E'};
-	uint8_t forward[] = {'F','O','R','W','A','R','D'};
-	uint8_t backward[] = {'B','A','C','K','W','A','R','D'};
+	//uint8_t forward[] = {'F','O','R','W','A','R','D'};
+	//uint8_t backward[] = {'B','A','C','K','W','A','R','D'};
 	HAL_UART_Transmit(&huart2, student, 9, 100);
 
 	volatile uint8_t Kp = 1;
@@ -143,8 +141,11 @@ int main(void)
 	float current_pos_top;
 	float current_pos_left;
 	float current_pos_right;
+	float PID_Output1;
+	float PID_Output2;
 
 	pca9685_init(&hi2c1,PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 1000.0f);
+
 
   /* USER CODE END 2 */
 
@@ -173,8 +174,6 @@ int main(void)
 		  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == 1)
 		  {
 			  Mode = OFF_MODE;
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, 0);
-			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
 			  OFF_BUTTON = 0;
 			  HAL_UART_Transmit(&huart2, OFF, 8, 100);
 		  }
@@ -191,13 +190,13 @@ int main(void)
 	  case ON_MODE:
 	  {
 	  	// Read Encoder Values
-	  	char left_enc_buffer[8];
+	  	//char left_enc_buffer[8];
 	  	current_pos_top = Read_Encoder_Top();
 	  	current_pos_left = Read_Encoder_Left();
 	  	current_pos_right = Read_Encoder_Right();
 
-	  	sprintf(left_enc_buffer, "\n%.5f", current_pos_top);
-	  	HAL_UART_Transmit(&huart2, left_enc_buffer, sizeof(left_enc_buffer), 100);
+//	  	sprintf(left_enc_buffer, "\n%.5f", current_pos_top);
+//	  	HAL_UART_Transmit(&huart2, left_enc_buffer, sizeof(left_enc_buffer), 100);
 
 
 	  	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,49 +242,44 @@ int main(void)
 	  	PID_Output1 = (Kp*Error1)+(Ki*Error_Integral1)+(Kd*Error_Derivative1); // Map to PWM Signal
 	  	PID_Output2 = (Kp*Error2)+(Ki*Error_Integral2)+(Kd*Error_Derivative2); // Map to PWM Signal
 
+	  	///// CHECK THIS IN MORNING
+	  	float dummy = (PID_Output1/350);
+	  	if (dummy <= 0)
+	  	{
+	  		dummy = dummy*(-1);
+	  	}
+	  	if (dummy >= 1.0)
+	  	{
+	  		dummy = 1.0;
+	  	}
+
+	  	// Print PID values
+	  	char PID_buffer[8];
+	  	sprintf(PID_buffer, "\n%.5f", dummy);
+	  	HAL_UART_Transmit(&huart2, PID_buffer, sizeof(PID_buffer), 100);
+
 	  	if(current_pos_top < Setpoint)
 	  	{
 	  		Set_Motor_Parameters(Forward);
 	  		//HAL_UART_Transmit(&huart2, backward, 8, 100);
-	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.05f);
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, dummy);
 	  	}
 
 	  	if(current_pos_top > Setpoint)
 	  	{
 	  		Set_Motor_Parameters(Backward);
 	  		//HAL_UART_Transmit(&huart2, forward, 7, 100);
-	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.05f);
+	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, dummy);
 	  	}
 
 	  	if(current_pos_top >= Max_Len)
 	  	{
-	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.0f);
-	  		Kill_Motors();
-
-	  		// Switch Encoder Timers Off
-		    HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
-		    HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
-		    HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
-
-	  		while(1)
-	  		{
-	  			// Do Nothing
-	  		}
+	  		Mode = OFF_MODE;
 	  	}
 
 	  	if(current_pos_top <= Min_Len)
 	  	{
-	  		pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.0f);
-	  		Kill_Motors();
-
-		    // Switch Encoder Timers Off
-			HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
-			HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
-			HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
-	  		while(1)
-	  		{
-	  			// Do Nothing
-	  		}
+	  		Mode = OFF_MODE;
 	  	}
 
 	  	break;
@@ -294,11 +288,18 @@ int main(void)
 	  case OFF_MODE:
 	  {
 		  Kill_Motors();
+		  pca9685_set_pwm(&hi2c1, PCA9685_I2C_DEFAULT_DEVICE_ADDRESS, 0, 0.0f);
+
+		  // Set LEDS
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, 0);
+		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
 
 		  // Switch Encoder Timers Off
 		  HAL_TIM_Encoder_Stop(&htim1,TIM_CHANNEL_ALL);
 		  HAL_TIM_Encoder_Stop(&htim2,TIM_CHANNEL_ALL);
 		  HAL_TIM_Encoder_Stop(&htim3,TIM_CHANNEL_ALL);
+
+		  HAL_UART_Transmit(&huart2, OFF, 8, 100);
 
 		  while(1)
 		  {

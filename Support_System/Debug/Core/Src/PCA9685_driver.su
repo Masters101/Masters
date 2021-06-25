@@ -1,2 +1,2 @@
-PCA9685_driver.c:24:6:pca9685_init	48	static
-PCA9685_driver.c:58:6:pca9685_set_pwm	48	static
+PCA9685_driver.c:40:6:pca9685_init	48	static
+PCA9685_driver.c:74:6:pca9685_set_pwm	48	static
